@@ -1,0 +1,14 @@
+Test code spike, interrogates Trello using Dispatch, and can use that to generate a specs test template file from the board/lists/cards/checklists/checklistitems.
+
+Re-running will add any new stuff from Trello, but won't overwrite anything already written
+
+You need to edit and add your keys/secrets/etc at the top before it runs at the moment as everything is hardcoded. Once you've done that, you can use it like so:
+
+      import com.redvblack.dispatch.trello._
+      val specs = Trello.loadExistingSpecs
+      val board = Trello.loadBoard
+      val comparison = Trello.compareSpecToBoard(specs, board)
+      Trello.insertIntoSpec(specs, board, comparison)
+
+
+
