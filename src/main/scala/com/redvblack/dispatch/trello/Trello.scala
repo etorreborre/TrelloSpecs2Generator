@@ -20,7 +20,7 @@ object Trello {
   val testPath = "/src/test/scala"
   val specName = "TrelloSpec"
   val specFileName = projectRoot + testPath + "/" + packageName.replace(".", "/") + "/GeneratedSpec.scala"
-  val boardId = "boardId"
+  val boardId = "BoardId"
 
   def generateOrUpdate = {
       if (!(new java.io.File(specFileName).exists)) {
@@ -89,7 +89,7 @@ object Trello {
 
   def toSpec(card:Card):List[String] = {
     val tabDepth = 1
-    List("\n" + ("\t" * tabDepth) + "\"Card[" + card.id + "] " + card.name.get + "\" should {") :::
+    List("\n" + ("\t" * tabDepth) + "\"Card[" + card.id + "](" + card.url.get +") " + card.name.get + "\" should {") :::
       // for each checklist generate a sub test
       (card.idChecklists.map(checkListId => {
         toSpec(Http(Checks(checkListId).checkList).get, tabDepth + 1)
