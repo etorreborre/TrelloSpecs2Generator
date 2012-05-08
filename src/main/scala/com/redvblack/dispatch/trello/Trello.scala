@@ -16,37 +16,40 @@ object Trello {
   val key = config._2
   val params:Map[String, String] = Map(("key" -> key), ("token" -> token), ("cards" -> "all"), ("card_fields" -> "all"), ("lists" -> "all"), ("checklists" -> "all"))
   val packageName = "com.redvblack.dispatch.trello"
-  val projectRoot = "Root of project to create test in"
+  val projectRoot = "/Users/bufferine/Dev/TrelloSpecs2Generator"
   val testPath = "/src/test/scala"
   val specName = "TrelloSpec"
-  val specFileName = projectRoot + testPath + "/" + packageName.replace(".", "/") + "generatedspec.scala"
+  val specFileName = projectRoot + testPath + "/" + packageName.replace(".", "/") + "/GeneratedSpec.scala"
   val boardId = "boardId"
-  val trelloConfigFileName = ".trello"
 
+  def generateOrUpdate = {
+      if (!(new java.io.File(specFileName).exists)) {
+        generateTestCases
+      }else {
+        val specs = loadExistingSpecs
+        val board = loadBoard
+        val compare = compareSpecToBoard(specs, board)
+        insertIntoSpec(specs, board, compare)
+      }
+  }
 
   def loadConfigFromHomeDirectory:Pair[String, String] = {
     val homeDir = System.getProperty("user.home")
     try {
-      val trelloConf:List[String] = scala.io.Source.fromFile(homeDir + "/" + trelloConfigFileName).getLines.toList
-      val token = trelloConf.filter(_.startsWith("token")).headOption.map(t => t.substring(t.indexOf("=") + 1).trim).getOrElse("Token missing from " + homeDir + "/" + trelloConfigFileName)
-      val key = trelloConf.filter(_.startsWith("key")).headOption.map(t => t.substring(t.indexOf("=") + 1).trim).getOrElse("Key missing from " + homeDir + "/" + trelloConfigFileName)
+      val trelloConf:List[String] = scala.io.Source.fromFile(homeDir + "/.trello").getLines.toList
+      val token = trelloConf.filter(_.startsWith("token")).headOption.map(t => t.substring(t.indexOf("=") + 1).trim).getOrElse("Token missing from " + homeDir + "/.trello")
+      val key = trelloConf.filter(_.startsWith("key")).headOption.map(t => t.substring(t.indexOf("=") + 1).trim).getOrElse("Key missing from " + homeDir + "/.trello")
       Pair(token, key)
     }catch {
       case x => {
+        x.printStackTrace
         Pair("Token missing - Error Loading Token " + x.getMessage, "Key missing - Error Loading Key " + x.getMessage)
       }
     }
   }
 
   def loadExistingSpecs:Map[String, Fragment] = {
-    /*
-    Text([4fa3ef06f5d35c5e3a021843] Event Create should)
-    Text([4fa3f15a9b4908fb570b2e69] Checklist should)
-    Example([4fa3f16c9b4908fb570b3dc1] Admin interface for event creation)
-    Example([4fa3f17d9b4908fb570b4c7a] Model supporting event creation and tagging)
-     */
     val es = Class.forName(packageName + "." + specName)
-
     val instance = es.newInstance
     val field = es.getDeclaredField("specFragments")
       field.setAccessible(true)
@@ -85,20 +88,35 @@ object Trello {
   }
 
   def toSpec(card:Card):List[String] = {
-    List("\"[" + card.id + "] " + card.name.get + "\" should {") :::
+    val tabDepth = 1
+    List("\n" + ("\t" * tabDepth) + "\"Card[" + card.id + "] " + card.name.get + "\" should {") :::
       // for each checklist generate a sub test
       (card.idChecklists.map(checkListId => {
-        val checkList = Http(Checks(checkListId).checkList).get
-        List("\n\t\"[" + checkList.id + "] " + checkList.name.get + "\" should {") :::
-          (checkList.checkItems.map(item => {
-            "\n\t\t\"[" + item.id + "] " + item.name.get + "\" in {\n\t\t\tpending\n\t\t}"
-          }).foldLeft(List[String]())((acc, next) => next :: acc)) :::  List("\n\t\tpending\n\t}")
+        toSpec(Http(Checks(checkListId).checkList).get, tabDepth + 1)
       }).foldLeft(List[String]())((acc, next) => next ::: acc)) :::
-      List("\npending\n}")
+      List("\n " + ("\t" * (tabDepth + 1)) + "pending" + "\n" + ("\t" * tabDepth) + "}")
+  }
+  def toSpec(checkItem:CheckItem, tabDepth:Int):List[String] = {
+    List("\n" + ("\t" * tabDepth) + "\"CheckItem[" + checkItem.id + "] " + checkItem.name.get + "\" in {",
+    "\n" + ("\t" * (tabDepth + 1)) + "pending",
+    "\n" + ("\t" * tabDepth) + "}")
+  }
+  def toSpec(checkList:CheckList, tabDepth:Int):List[String] =  {
+    List("\n" + ("\t" * tabDepth) + "\"CheckList[" + checkList.id + "] " + checkList.name.get + "\" should {") :::
+      checkList.checkItems.flatMap(item => {
+        toSpec(item, tabDepth + 1)
+      }) :::
+    List("\n" + ("\t" * (tabDepth + 1)) + "pending",
+    "\n" + ("\t" * tabDepth) + "}"
+        )
   }
 
   def insertIntoSpec(specs:Map[String, Fragment], trello:BoardCase, missings:Pair[List[String], List[String]]) = {
-    var specFile:List[String] = scala.io.Source.fromFile(specFileName).getLines.toList
+    var specFile:List[String] = try {
+      scala.io.Source.fromFile(specFileName).getLines.toList
+    }catch {
+      case x => List[String]()
+    }
 
     // missing from specs
     missings._2.foreach(m => {
@@ -142,31 +160,20 @@ object Trello {
     out.close
   }
 
-
-
   def generateTestCases = {
     // grab the boards, and the cards for the boards
     val board:BoardCase = Http(Board(boardId).get).get
     // for each card, generate a test
-    val testCase = " package " + packageName +
+    val testCase = List(" package " + packageName +
     " \nimport org.specs2.mutable._ " +
     " \nimport org.specs2.specification._ " +
-    " \nclass RiakClientSpec extends Specification { " +
+    " \nclass GeneratedSpec extends Specification { ") :::
     board.cards.map(card => {
-      "\n\"[" + card.id + "] " + card.name.get + "\" should {" +
-      // for each checklist generate a sub test
-         card.idChecklists.map(checkListId => {
-           val checkList = Http(Checks(checkListId).checkList).get
-           "\n\t\"[" + checkList.id + "] " + checkList.name.get + "\" should {" +
-           checkList.checkItems.map(item => {
-             "\n\t\t\"[" + item.id + "] " + item.name.get + "\" in {\n\t\t\tpending\n\t\t}"
-           }).foldLeft("\n")((acc, next) => acc + next) + "\n\t\tpending\n\t}"
-         }).foldLeft("\n")((acc, next) => acc + next) +
-      "\npending\n}"
-    }).foldLeft("\n")((acc, next) => acc + "\n" + next) + "\npending\n}"
+      toSpec(card)
+    }).foldLeft(List[String]())((acc, next) => acc ::: next) ::: List("\npending\n}")
 
     val out = new java.io.FileWriter(specFileName)
-    out.write(testCase)
+    out.write(testCase.mkString(""))
     out.close
   }
 }

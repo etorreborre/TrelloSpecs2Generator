@@ -2,13 +2,10 @@ Test code spike, interrogates Trello using Dispatch, and can use that to generat
 
 Re-running will add any new stuff from Trello, but won't overwrite anything already written
 
-You need to create a <homedirectory>/.trello file with your token and key (see below for example), then once you've done that, you can use it like so:
+You need to create a <homedirectory>/.trello file with your token and key (see below for example), update the package/project paths and filenames then once you've done that, you can use it like so:
 
       import com.redvblack.dispatch.trello._
-      val specs = Trello.loadExistingSpecs
-      val board = Trello.loadBoard
-      val comparison = Trello.compareSpecToBoard(specs, board)
-      Trello.insertIntoSpec(specs, board, comparison)
+      Trello.generateOrUpdate
 
 .trello:
   
