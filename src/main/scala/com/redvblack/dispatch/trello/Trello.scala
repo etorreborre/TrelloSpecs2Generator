@@ -11,16 +11,32 @@ import org.specs2.specification._
 
 object Trello {
   val host = :/("api.trello.com") / "1"
-//  val search = :/("search.twitter.com")
-  val token =  "YourTokenHere"
-  val key = "YourKeyHere"
+  val config = loadConfigFromHomeDirectory
+  val token = config._1
+  val key = config._2
   val params:Map[String, String] = Map(("key" -> key), ("token" -> token), ("cards" -> "all"), ("card_fields" -> "all"), ("lists" -> "all"), ("checklists" -> "all"))
-  val packageName = "com.redvblack.trello"
+  val packageName = "com.redvblack.dispatch.trello"
   val projectRoot = "Root of project to create test in"
   val testPath = "/src/test/scala"
   val specName = "TrelloSpec"
   val specFileName = projectRoot + testPath + "/" + packageName.replace(".", "/") + "generatedspec.scala"
   val boardId = "boardId"
+  val trelloConfigFileName = ".trello"
+
+
+  def loadConfigFromHomeDirectory:Pair[String, String] = {
+    val homeDir = System.getProperty("user.home")
+    try {
+      val trelloConf:List[String] = scala.io.Source.fromFile(homeDir + "/" + trelloConfigFileName).getLines.toList
+      val token = trelloConf.filter(_.startsWith("token")).headOption.map(t => t.substring(t.indexOf("=") + 1).trim).getOrElse("Token missing from " + homeDir + "/" + trelloConfigFileName)
+      val key = trelloConf.filter(_.startsWith("key")).headOption.map(t => t.substring(t.indexOf("=") + 1).trim).getOrElse("Key missing from " + homeDir + "/" + trelloConfigFileName)
+      Pair(token, key)
+    }catch {
+      case x => {
+        Pair("Token missing - Error Loading Token " + x.getMessage, "Key missing - Error Loading Key " + x.getMessage)
+      }
+    }
+  }
 
   def loadExistingSpecs:Map[String, Fragment] = {
     /*
